@@ -1,7 +1,16 @@
+
+using EF.Mail;
 using EF.models;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddOptions();              // Kích hoạt Options
+var mailSettings = builder.Configuration.GetSection("MailSettings");// đọc config
+builder.Services.Configure<MailSettings>(mailSettings);               // đăng ký để Inject
+builder.Services.AddTransient<IEmailSender, SendMailService>();        // Đăng ký dịch vụ Mail
 
 // Add services to the container.
 builder.Services.AddRazorPages();
@@ -10,7 +19,44 @@ builder.Services.AddDbContext<MyBlogContext>(options =>
     string connectstring = builder.Configuration.GetConnectionString("ArticleContext");
     options.UseSqlServer(connectstring);
 });
+
+// builder.Services.AddIdentity<User, IdentityRole>()
+//                 .AddEntityFrameworkStores<MyBlogContext>()
+//                 .AddDefaultTokenProviders();
+builder.Services.AddDefaultIdentity<User>()
+                .AddEntityFrameworkStores<MyBlogContext>()
+                .AddDefaultTokenProviders();
+
+// Truy cập IdentityOptions
+builder.Services.Configure<IdentityOptions>(options =>
+{
+    // Thiết lập về Password
+    options.Password.RequireDigit = false; // Không bắt phải có số
+    options.Password.RequireLowercase = false; // Không bắt phải có chữ thường
+    options.Password.RequireNonAlphanumeric = false; // Không bắt ký tự đặc biệt
+    options.Password.RequireUppercase = false; // Không bắt buộc chữ in
+    options.Password.RequiredLength = 3; // Số ký tự tối thiểu của password
+    options.Password.RequiredUniqueChars = 1; // Số ký tự riêng biệt
+
+    // Cấu hình Lockout - khóa user
+    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5); // Khóa 5 phút
+    options.Lockout.MaxFailedAccessAttempts = 5; // Thất bại 5 lầ thì khóa
+    options.Lockout.AllowedForNewUsers = true;
+
+    // Cấu hình về User.
+    options.User.AllowedUserNameCharacters = // các ký tự đặt tên user
+        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._@+";
+    options.User.RequireUniqueEmail = true;  // Email là duy nhất
+
+    // Cấu hình đăng nhập.
+    options.SignIn.RequireConfirmedEmail = true;            // Cấu hình xác thực địa chỉ email (email phải tồn tại)
+    options.SignIn.RequireConfirmedPhoneNumber = false;     // Xác thực số điện thoại
+
+});
+
 var app = builder.Build();
+
+
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
@@ -25,6 +71,7 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapRazorPages();
